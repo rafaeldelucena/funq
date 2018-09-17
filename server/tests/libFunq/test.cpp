@@ -899,6 +899,20 @@ private slots:
 
         QCOMPARE(item->property("color").toString(), QString("#ffffff"));
     }
+
+    void test_quick_item_children() {
+        QQuickView view;
+        view.setSource(QUrl::fromLocalFile(SOURCE_DIR "test_children.qml"));
+        view.show();
+        QTest::qWaitForWindowExposed(&view);
+
+        QBuffer buffer;
+        Player player(&buffer);
+
+        QtJson::JsonObject command;
+
+        QtJson::JsonObject result = player.quick_item_children(command);
+    }
 #endif
 };
 
