@@ -222,3 +222,5 @@ Example: ::
 .. autoclass:: QuickItem
 
   .. automethod:: QuickItem.click
+
+  .. automethod:: QuickItem.children
