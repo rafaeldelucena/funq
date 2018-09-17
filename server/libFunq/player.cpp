@@ -599,6 +599,7 @@ QtJson::JsonObject Player::model_item_action(const QtJson::JsonObject & command)
 }
 
 void dump_quick_items(Player * player, const QList<QQuickItem *> & items, const qulonglong & viewid, bool recursive, QtJson::JsonObject & out) {
+#ifdef QT_QUICK_LIB
     QtJson::JsonArray outitems;
     foreach(QQuickItem* item, items) {
         QtJson::JsonObject outitem;
@@ -622,6 +623,9 @@ void dump_quick_items(Player * player, const QList<QQuickItem *> & items, const 
         outitems << outitem;
     }
     out["items"] = outitems;
+#else
+    createQtQuickOnlyError();
+#endif
 }
 
 QtJson::JsonObject Player::quick_item_children(const QtJson::JsonObject & command) {
