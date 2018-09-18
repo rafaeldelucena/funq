@@ -33,12 +33,23 @@
 # knowledge of the CeCILL v2.1 license and that you accept its terms.
 
 from base import AppTestCase
-from funq.testcase import parameterized
-
-from funq.models import Widget, ComboBox, HeaderView
 from funq.client import FunqClient
-from funq.errors import HooqAliasesKeyError, FunqError
 
 class TestQmlItemChilden(AppTestCase):
 
+    def setUp(self):
+        self.funq = FunqClient()
+
+    def get_children_by_property(self, prop):
+        widget = self.funq.active_widget()
+        item = widget.item(id='parent')
+        children = widget.children()
+        return [child for child in children if child.properties().get(prop)]
+
     def test_non_recursive_children(self):
+        children = self.get_children_by_property('text')
+        self.assertIn('Child', children)
+
+    def test_recursive_children(self):
+        children = self.get_children_by_property('text')
+        self.assertIn('Grandchild', children)
