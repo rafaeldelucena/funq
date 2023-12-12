@@ -41,6 +41,14 @@ import json
 import base64
 
 
+# python 3 compatibility
+# https://stackoverflow.com/questions/11301138/how-to-check-if-variable-is-string-with-python-2-and-3-compatibility)
+try:
+    basestring
+except NameError:
+    basestring = str
+
+
 class TreeItem(object):  # pylint: disable=R0903
 
     """
@@ -229,22 +237,74 @@ class Object(object):
         )['result_slot']
 
 
+class Action(Object):
+
+    """
+    Allow to manipulate a QAction or derived.
+    """
+
+    def trigger(self, blocking=True, wait_for_enabled=10.0):
+        """
+        Trigger the QAction. If wait_for_enabled is > 0 (default), it will wait
+        until the action becomes active (enabled and visible) before triggering
+        it. If blocking is True (default), funq waits until the triggered
+        action has completed (synchronous trigger). For actions which are
+        blocking by themself (e.g. actions which open a modal dialog), you must
+        set blocking to False (asynchronous trigger), otherwise funq freezes.
+        """
+        if wait_for_enabled > 0.0:
+            self.wait_for_properties({'enabled': True, 'visible': True},
+                                     timeout=wait_for_enabled)
+        self.client.send_command('action_trigger', oid=self.oid,
+                                 blocking=blocking)
+
+
+class AbstractItemModel(Object):
+
+    """
+    Allow to manipulate a QAbstractItemModel or derived.
+    """
+
+    def items(self):
+        """
+        Returns an instance of :class:`ModelItems` with all items of this
+        model.
+        """
+        data = self.client.send_command('model_items', oid=self.oid)
+        return ModelItems.create(self.client, data)
+
+
 class Widget(Object):
 
     """
     Allow to manipulate a QWidget or derived.
     """
 
-    def click(self, wait_for_enabled=10.0):
+    def click(self, wait_for_enabled=10.0, btn='left'):
         """
-        Click on the widget. If wait_for_enabled is > 0 (default), it will wait
-        until the widget become active (enabled and visible) before sending
-        click.
+        Click on the widget.
+
+        If wait_for_enabled is > 0 (default), it will wait until the widget
+        become active (enabled and visible) before sending click.
+
+        The target mouse button can be configured with the `btn` parameter: It
+        can be either 'left', 'middle' or 'right'. Default is 'left'.
+
         """
         if wait_for_enabled > 0.0:
             self.wait_for_properties({'enabled': True, 'visible': True},
                                      timeout=wait_for_enabled)
-        self.client.send_command('widget_click', oid=self.oid)
+        if btn == 'left':
+            action = 'click'
+        elif btn == 'right':
+            action = 'rightclick'
+        elif btn == 'middle':
+            action = 'middleclick'
+        else:
+            raise ValueError('Invalid mouse button: %s', btn)
+        self.client.send_command('widget_click',
+                                 oid=self.oid,
+                                 mouseAction=action)
 
     def dclick(self, wait_for_enabled=10.0):
         """
@@ -304,20 +364,94 @@ class Widget(Object):
         self.client.drag_n_drop(self, src_pos=src_pos, dest_widget=dest_widget,
                                 dest_pos=dest_pos)
 
+    def move(self, x=None, y=None):
+        """
+        Move the widget, using QWidget::move(). One can either only change X or
+        Y coordinate, or both at the same time.
+
+        :param int x: New X coordinate (optional).
+        :param int y: New Y coordinate (optional).
+        :return: New position as tuple (X, Y).
+        """
+        response = self.client.send_command('widget_move', oid=self.oid,
+                                            x=x, y=y)
+        return response['x'], response['y']
+
+    def resize(self, width=None, height=None):
+        """
+        Resize the widget, using QWidget::resize(). One can either only change
+        width or height, or both at the same time.
+
+        :param int width: New width (optional).
+        :param int height: New height (optional).
+        :return: New size as tuple (width, height).
+        """
+        response = self.client.send_command('widget_resize', oid=self.oid,
+                                            width=width, height=height)
+        return response['width'], response['height']
+
     def close(self):
         """
         Ask to close a widget, using QWidget::close().
         """
         self.client.send_command('widget_close', oid=self.oid)
 
+    def grab(self, format="PNG"):
+        """
+        Save the widgets content as an image.
+
+        :param string format: The format of the grabbed image.
+        :return: The image as a binary blob in the given format.
+        """
+        data = self.client.send_command('grab', format=format, oid=self.oid)
+        return base64.standard_b64decode(data['data'])
+
+    def map_position_from(self, x, y, parent):
+        """
+        Map a given parent's coordinate or global coordinate to a local widget
+        coordinate. See Qt's documentation of `QWidget::mapFrom()` and
+        `QWidget::mapFromGlobal()` for details.
+
+        :param int x: X coordinate relative to parent.
+        :param int y: Y coordinate relative to parent.
+        :param parent: One of this widget's parent (:class:`ModelItem`)
+                       or `None` to map from global coordinates.
+        :return: Local widget coordinates as tuple (X, Y).
+        """
+        parent_oid = parent.oid if parent else None
+        response = self.client.send_command('widget_map_position',
+                                            oid=self.oid,
+                                            parent_oid=parent_oid,
+                                            direction='from', x=x, y=y)
+        return response['x'], response['y']
+
+    def map_position_to(self, x, y, parent):
+        """
+        Map a given widget coordinate to a parent's coordinate or global
+        coordinate. See Qt's documentation of `QWidget::mapTo()` and
+        `QWidget::mapToGlobal()` for details.
+
+        :param int x: Local X coordinate.
+        :param int y: Local Y coordinate.
+        :param parent: One of this widget's parent ([type: :class:`ModelItem`])
+                       or None to map to global coordinates.
+        :return: Coordinates relative to the given parent widget, or
+                 global coordinates as tuple (X, Y).
+        """
+        parent_oid = parent.oid if parent else None
+        response = self.client.send_command('widget_map_position',
+                                            oid=self.oid,
+                                            parent_oid=parent_oid,
+                                            direction='to', x=x, y=y)
+        return response['x'], response['y']
+
 
 class ModelItem(TreeItem):
 
     """
-    Allow to manipulate a modelitem in a QAbstractModelItem or derived.
+    Allow to manipulate a modelitem in a QAbstractItemModel or derived.
 
-    :var viewid: ID of the view attached to the model containing this item
-                 [type: long]
+    :var modelid: ID of the model containing this item [type: long]
     :var row: item row number [type: int]
     :var column: item column number [type: int]
     :var value: item text value [type: unicode]
@@ -326,22 +460,11 @@ class ModelItem(TreeItem):
     :var items: list of subitems [type: :class:`ModelItem`]
     """
 
-    viewid = None
+    modelid = None
     row = None
     column = None
     itempath = None
     check_state = None
-
-    def _action(self, itemaction, origin=None, offset_x=None, offset_y=None):
-        """ Send the 'model_item_action' action """
-        self.client.send_command('model_item_action',
-                                 oid=self.viewid,
-                                 itemaction=itemaction,
-                                 row=self.row, column=self.column,
-                                 origin=origin,
-                                 offset_x=offset_x,
-                                 offset_y=offset_y,
-                                 itempath=self.itempath)
 
     def is_checkable(self):
         """Returns True if the item is checkable"""
@@ -351,53 +474,11 @@ class ModelItem(TreeItem):
         """Returns True if the item is checked"""
         return self.check_state == 'checked'
 
-    def select(self):
-        """
-        Select this item.
-        """
-        self._action("select")
-
-    def edit(self):
-        """
-        Edit this item.
-        """
-        self._action("edit")
-
-    def click(self, origin="center", offset_x=0, offset_y=0):
-        """
-        Click on this item.
-
-        :param origin: Origin of the cursor coordinates of the ModelItem
-                       object. Availables values: "center", "left" or "right".
-        :param offset_x: x position relative to the origin.
-                         Negative value allowed.
-        :param offset_y: y position relative to the origin.
-                         Negative value allowed.
-        """
-        self._action(
-            "click", origin=origin, offset_x=offset_x, offset_y=offset_y
-        )
-
-    def dclick(self, origin="center", offset_x=0, offset_y=0):
-        """
-        Double click on this item.
-
-        :param origin: Origin of the cursor coordinates of the ModelItem
-                       object.
-        :param offset_x: x position relative to the origin.
-                         Negative value allowed.
-        :param offset_y: y position relative to the origin.
-                         Negative value allowed.
-        """
-        self._action(
-            "doubleclick", origin=origin, offset_x=offset_x, offset_y=offset_y
-        )
-
 
 class ModelItems(TreeItems):
 
     """
-    Allow to manipulate all modelitems in a QAbstractModelItem or derived.
+    Allow to manipulate all modelitems in a QAbstractItemModel or derived.
 
     :var items: list of :class:`ModelItem`
     """
@@ -476,13 +557,89 @@ class AbstractItemView(Widget):
     editor_class_names = ('QLineEdit', 'QComboBox', 'QSpinBox',
                           'QDoubleSpinBox')
 
-    def model_items(self):
+    def model(self):
         """
-        Returns an instance of :class:`ModelItems` based on the model
-        associated to the view.
+        Returns the model (:class:`AbstractItemModel`) which is displayed in
+        this item view widget.
         """
-        data = self.client.send_command('model_items', oid=self.oid)
-        return ModelItems.create(self.client, data)
+        data = self.client.send_command('model', oid=self.oid)
+        return AbstractItemModel.create(self.client, data)
+
+    def _item_action(self, item, itemaction, origin=None, offset_x=None,
+                     offset_y=None):
+        """ Send the 'model_item_action' action for a given item """
+        self.client.send_command('model_item_action',
+                                 oid=self.oid,
+                                 itemaction=itemaction,
+                                 row=item.row, column=item.column,
+                                 origin=origin,
+                                 offset_x=offset_x,
+                                 offset_y=offset_y,
+                                 itempath=item.itempath)
+
+    def select_item(self, item):
+        """
+        Select the specified item.
+
+        :param ModelItem item: The item to select (object retrieved from
+                               (:meth:`model`)).
+        """
+        self._item_action(item, "select")
+
+    def edit_item(self, item):
+        """
+        Edit the specified item.
+
+        :param ModelItem item: The item to edit (object retrieved from
+                               (:meth:`model`)).
+        """
+        self._item_action(item, "edit")
+
+    def click_item(self, item, origin="center", offset_x=0, offset_y=0,
+                   btn="left"):
+        """
+        Click on the specified item.
+
+        :param ModelItem item: The item to click (object retrieved from
+                               (:meth:`model`)).
+        :param origin: Origin of the cursor coordinates of the ModelItem
+                       object. Availables values: "center", "left" or "right".
+        :param offset_x: x position relative to the origin.
+                         Negative value allowed.
+        :param offset_y: y position relative to the origin.
+                         Negative value allowed.
+        :param btn: The mouse button to click.
+                    Available values: "left", "middle" or "right".
+        """
+        if btn == "left":
+            action = "click"
+        elif btn == "right":
+            action = "rightclick"
+        elif btn == "middle":
+            action = "middleclick"
+        else:
+            raise ValueError("Invalid mouse button: %s", btn)
+        self._item_action(
+            item, action, origin=origin, offset_x=offset_x, offset_y=offset_y
+        )
+
+    def dclick_item(self, item, origin="center", offset_x=0, offset_y=0):
+        """
+        Double click on the specified item.
+
+        :param ModelItem item: The item to click (object retrieved from
+                               (:meth:`model`)).
+        :param origin: Origin of the cursor coordinates of the ModelItem
+                       object.
+        :param offset_x: x position relative to the origin.
+                         Negative value allowed.
+        :param offset_y: y position relative to the origin.
+                         Negative value allowed.
+        """
+        self._item_action(
+            item, "doubleclick", origin=origin, offset_x=offset_x,
+            offset_y=offset_y
+        )
 
     def current_editor(self, editor_class_name=None):
         """
@@ -643,11 +800,19 @@ class GItem(TreeItem):
                                  itemaction=itemaction,
                                  gid=self.gid)
 
-    def click(self):
+    def click(self, btn="left"):
         """
         Click on this gitem.
         """
-        self._action("click")
+        if btn == "left":
+            action = "click"
+        elif btn == "right":
+            action = "rightclick"
+        elif btn == "middle":
+            action = "middleclick"
+        else:
+            raise ValueError("Invalid mouse button: %s", btn)
+        self._action(action)
 
     def dclick(self):
         """
@@ -718,19 +883,13 @@ class ComboBox(Widget):
     """
     CPP_CLASS = 'QComboBox'
 
-    def model_items(self):
+    def model(self):
         """
-        Returns the items  (:class:`ModelItems`) associated to this combobox.
+        Returns the model (:class:`AbstractItemModel`) which contains the items
+        of this combobox.
         """
-        # create and show QComboBoxListView
-        self.click()
-        # get this QComboBoxListView widget
-        internal_qt_name = '::QComboBoxPrivateContainer::QComboBoxListView'
-        combo_edit_view = self.client.widget(path=self.path + internal_qt_name)
-        model_items = combo_edit_view.model_items()
-        # This properly close the QComboBoxListView widget
-        combo_edit_view.click()
-        return model_items
+        data = self.client.send_command('model', oid=self.oid)
+        return AbstractItemModel.create(self.client, data)
 
     def set_current_text(self, text):
         """
@@ -739,10 +898,13 @@ class ComboBox(Widget):
         if not isinstance(text, basestring):
             raise TypeError('the text parameter must be a string'
                             ' - got %s' % type(text))
-        model_items = self.model_items()
         column = self.properties()['modelColumn']
         index = -1
-        for item in model_items.items:
+        # WORKAROUND: Call items() via function pointer to prevent py2to3 from
+        # performing an illegal conversion which doesn't work on Python 3. This
+        # should be removed once we have "real" Python 3 compatibility.
+        items_func = AbstractItemModel.items
+        for item in items_func(self.model()).iter():
             if column == int(item.column) and item.value == text:
                 index = int(item.row)
                 break

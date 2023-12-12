@@ -1,6 +1,6 @@
 /*
 Copyright: SCLE SFE
-Contributor: Julien Pagès <j.parkouss@gmail.com>
+Contributors: https://github.com/parkouss/funq/graphs/contributors
 
 This software is a computer program whose purpose is to test graphical
 applications written with the QT framework (http://qt.digia.com/).
@@ -32,15 +32,40 @@ The fact that you are presently reading this means that you have had
 knowledge of the CeCILL v2.1 license and that you accept its terms.
 */
 
-#include "fenPrincipale.h"
+#include "widgets.h"
 
 #include <QApplication>
 
+template <typename T>
+inline void execDialog(QLabel * statusLabel, QWidget * parent) {
+    T dialog(statusLabel, parent);
+    dialog.exec();
+}
+
 int main(int argc, char * argv[]) {
-    QApplication a(argc, argv);
+    QApplication app(argc, argv);
 
-    fenPrincipale w;
-    w.show();
+    if (app.arguments().contains("--show-message-box-at-startup")) {
+        // This is needed to test if the injection of libFunq also works if Qt's
+        // main event loop is not called directly at application startup. A
+        // message box blocks the whole application, so by closing this dialog
+        // with funq we can see if funq was successfully injected into the
+        // blocking application.
+        QMessageBox::information(0, "funq", "click me away");
+    }
 
-    return a.exec();
+    MainWindow win;
+    win.addDialogButton("action", &execDialog<ActionDialog>);
+    win.addDialogButton("click", &execDialog<ClickDialog>);
+    win.addDialogButton("widgetclick", &execDialog<WidgetClickDialog>);
+    win.addDialogButton("doubleclick", &execDialog<DoubleClickDialog>);
+    win.addDialogButton("keyclick", &execDialog<KeyClickDialog>);
+    win.addDialogButton("retrieve", &execDialog<RetrieveWidget>);
+    win.addDialogButton("shortcut", &execDialog<ShortcutDialog>);
+    win.addDialogButton("table", &execDialog<TableDialog>);
+    win.addDialogButton("combobox", &execDialog<ComboBoxDialog>);
+    win.resize(800, 600);
+    win.show();
+
+    return app.exec();
 }

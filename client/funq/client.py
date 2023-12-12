@@ -49,10 +49,18 @@ import logging
 
 from funq.aliases import HooqAliases
 from funq.tools import wait_for
-from funq.models import Widget
+from funq.models import Action, Widget
 from funq.errors import FunqError, TimeOutError
 
 LOG = logging.getLogger('funq.client')
+
+
+# python 3 compatibility
+# https://stackoverflow.com/questions/11301138/how-to-check-if-variable-is-string-with-python-2-and-3-compatibility)
+try:
+    basestring
+except NameError:
+    basestring = str
 
 
 class FunqClient(object):
@@ -82,14 +90,14 @@ class FunqClient(object):
 
         self.aliases = aliases
 
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
         def connect():
             """ try to connect """
             try:
+                self._socket = socket.socket(socket.AF_INET,
+                                             socket.SOCK_STREAM)
                 self._socket.connect((host, port))
                 return True
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno != errno.ECONNREFUSED:
                     raise
                 return e
@@ -162,6 +170,49 @@ class FunqClient(object):
         """
         self._raw_send('quit', {})
 
+    def action(self, alias=None, path=None, timeout=10.0,
+               timeout_interval=0.1, wait_active=True):
+        """
+        Returns an instance of a :class:`funq.models.Action` or derived
+        identified with an alias or with its complete path.
+
+        Example::
+
+          action = client.action('my_alias')
+
+        :param alias: alias defined in the aliases file.
+        :param path: complete path for the action
+        :param timeout: if > 0, tries to get the action until timeout
+                        is reached (second)
+        :param timeout_interval: time between two atempts to get an action
+                                 (seconds)
+        :param wait_active: If true - the default -, wait until the action
+                            become visible and enabled.
+        """
+        if not (alias or path):
+            raise TypeError("alias or path must be defined")
+
+        if alias:
+            path = self.aliases[alias]
+
+        wdata = [None]
+
+        def get_action():
+            """ Try to get the action """
+            try:
+                wdata[0] = self.send_command('widget_by_path', path=path)
+                return True
+            except FunqError as err:
+                if err.classname != 'InvalidWidgetPath':
+                    raise
+                return err
+        wait_for(get_action, timeout, timeout_interval)
+
+        action = Action.create(self, wdata[0])
+        if wait_active:
+            action.wait_for_properties({'enabled': True, 'visible': True})
+        return action
+
     def widget(self, alias=None, path=None, timeout=10.0,
                timeout_interval=0.1, wait_active=True):
         """
@@ -194,7 +245,7 @@ class FunqClient(object):
             try:
                 wdata[0] = self.send_command('widget_by_path', path=path)
                 return True
-            except FunqError, err:
+            except FunqError as err:
                 if err.classname != 'InvalidWidgetPath':
                     raise
                 return err
@@ -244,7 +295,7 @@ class FunqClient(object):
             try:
                 wdata[0] = self.send_command('active_widget', type=widget_type)
                 return True
-            except FunqError, err:
+            except FunqError as err:
                 if err.classname != 'NoActiveWindow':
                     raise
                 return err
@@ -281,7 +332,7 @@ class FunqClient(object):
         """
         Take a screenshot of the active desktop.
         """
-        data = self.send_command('desktop_screenshot', format=format_)
+        data = self.send_command('grab', format=format_)
         if isinstance(stream, basestring):
             stream = open(stream, 'wb')
         raw = base64.standard_b64decode(data['data'])

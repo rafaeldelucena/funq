@@ -33,44 +33,14 @@
 # knowledge of the CeCILL v2.1 license and that you accept its terms.
 
 from funq_server.runner import RunnerInjector
-import winappdbg
-import time
 
 
-class WindowsRunnerInjector(RunnerInjector):
-    max_wait = 20  # 20 seconds to let the process starts well
+class MacRunnerInjector(RunnerInjector):
 
-    def start_subprocess(self):
-        RunnerInjector.start_subprocess(self)
-        # wait for the process to be be running...
-        proc = winappdbg.Process(self._proc.pid)
-        start = time.time()
-        while True:
-            # wait for QT to be loaded
-            if self._proc.poll() is not None:
-                raise RuntimeError("The process has finished with an error"
-                                   " code of %d before we could hook it with"
-                                   " funq." % self._proc.returncode)
-
-            if start + self.max_wait < time.time():
-                self._proc.terminate()
-                raise RuntimeError("Error while waiting for subprocess to be"
-                                   " launched. Is the executable linked to"
-                                   " qt4 ?")
-            try:
-                proc.scan_modules()
-            except WindowsError:
-                # Following exception occurs sometimes, but it still works fine
-                # so let's ignore it: WindowsError: [Error 299] Only part of a
-                # ReadProcessMemory or WriteProcessMemory request was completed
-                pass
-            lib_names = [lib.get_name() for lib in proc.iter_modules()]
-            qt_lib_names = ['qtguid4', 'qtgui4', 'qt5guid', 'qt5gui']
-            if len(set(qt_lib_names).intersection(set(lib_names))) > 0:
-                break
-            time.sleep(0.01)
-
-        # wait a bit, and hope that QT is now really initialized !
-        time.sleep(1)
-        # we can inject the dll
-        proc.inject_dll(self.library_path)
+    def __init__(self, library_path, args, env):
+        RunnerInjector.__init__(self, library_path, args, env)
+        env['DYLD_FORCE_FLAT_NAMESPACE'] = '1'
+        if 'DYLD_INSERT_LIBRARIES' in env:
+            env['DYLD_INSERT_LIBRARIES'] += ':' + self.library_path
+        else:
+            env['DYLD_INSERT_LIBRARIES'] = self.library_path

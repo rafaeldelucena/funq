@@ -19,6 +19,22 @@ The Object base class
   .. automethod:: Object.call_slot
 
 
+The Action base class
+---------------------
+
+An Action is often obtained with :meth:`funq.client.FunqClient.action` .
+
+Example::
+
+  my_action = self.funq.action('my_action')
+
+.. inheritance-diagram:: Action
+
+.. autoclass:: Action
+
+  .. automethod:: Action.trigger
+
+
 The Widget base class
 ---------------------
 
@@ -43,33 +59,74 @@ Example::
   .. automethod:: Widget.drag_n_drop
 
   .. automethod:: Widget.activate_focus
+  
+  .. automethod:: Widget.move
+  
+  .. automethod:: Widget.resize
 
   .. automethod:: Widget.close
+
+  .. automethod:: Widget.grab
+
+  .. automethod:: Widget.map_position_from
+
+  .. automethod:: Widget.map_position_to
 
 Interacting with the data of QT Model/View framework
 ----------------------------------------------------
 
-To interact with items in QAbstractTableModel, it is needed to get the
-associated view (QAbstractItemView). The returned instance will be of type
-:class:`AbstractItemView` and the data will then be retrievable with
-the :meth:`AbstractItemView.model_items` method.
+To interact with items in a `QAbstractItemView` (e.g. `QTableView`) it is
+needed to get the associated model (`QAbstractItemModel`) with the method
+:meth:`AbstractItemView.model`. The returned instance will be of type
+:class:`AbstractItemModel` and the data will then be retrievable with
+the :meth:`AbstractItemModel.items` method.
 
 Example::
 
   view = self.funq.widget('my_tableview')
   assert isinstance(view, AbstractItemView)
 
-  model_items = view.model_items()
-  item = model_items.item_by_named_path(['item1'])
+  model = view.model()  # type: AbstractItemModel
+  items = model.items()  # type: ModelItems
+  item = items.item_by_named_path(['item1'])  # type: ModelItem
 
-  item.dclick()
+  view.dclick_item(item)
+
+
+.. autoclass:: AbstractItemModel
+
+  .. automethod:: AbstractItemModel.items
+
+
+.. autoclass:: ModelItems
+
+  .. automethod:: ModelItems.iter
+
+  .. automethod:: ModelItems.item_by_named_path
+
+  .. automethod:: ModelItems.row_by_named_path
+
+
+.. autoclass:: ModelItem
+
+  .. automethod:: ModelItem.is_checkable
+
+  .. automethod:: ModelItem.is_checked
 
 
 .. inheritance-diagram:: AbstractItemView
 
 .. autoclass:: AbstractItemView
 
-  .. automethod:: AbstractItemView.model_items
+  .. automethod:: AbstractItemView.model
+
+  .. automethod:: AbstractItemView.select_item
+
+  .. automethod:: AbstractItemView.edit_item
+
+  .. automethod:: AbstractItemView.click_item
+
+  .. automethod:: AbstractItemView.dclick_item
 
   .. automethod:: AbstractItemView.current_editor
 
@@ -89,35 +146,13 @@ Example::
 
   .. automethod:: TreeView.header
 
-.. autoclass:: ModelItems
-
-  .. automethod:: ModelItems.iter
-
-  .. automethod:: ModelItems.item_by_named_path
-
-  .. automethod:: ModelItems.row_by_named_path
-
-
-.. autoclass:: ModelItem
-
-  .. automethod:: ModelItem.select
-
-  .. automethod:: ModelItem.edit
-
-  .. automethod:: ModelItem.click
-
-  .. automethod:: ModelItem.dclick
-
-  .. automethod:: ModelItem.is_checkable
-
-  .. automethod:: ModelItem.is_checked
-
 
 .. autoclass:: HeaderView
 
   .. automethod:: HeaderView.header_texts
 
   .. automethod:: HeaderView.header_click
+
 
 Interacting with the data of QT Graphics View framework
 -------------------------------------------------------
@@ -146,7 +181,7 @@ Example::
   .. automethod:: GraphicsView.gitems
 
   .. automethod:: GraphicsView.dump_gitems
-  
+
   .. automethod:: GraphicsView.grab_scene
 
 
@@ -180,7 +215,7 @@ Other widgets
 
 .. autoclass:: ComboBox
 
-  .. automethod:: ComboBox.model_items
+  .. automethod:: ComboBox.model
 
   .. automethod:: ComboBox.set_current_text
 

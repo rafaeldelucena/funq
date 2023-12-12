@@ -32,7 +32,23 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL v2.1 license and that you accept its terms.
 
-"""
-funq module, containing the __version__ string.
-"""
-__version__ = '1.2.0'
+from base import AppTestCase
+
+
+class TestAction(AppTestCase):
+
+    def test_blocking_trigger_to_nonblocking_action(self):
+        self.start_dialog('action')
+        action = self.funq.action(path='mainWindow::ActionDialog::nonblockingAction')
+        action.trigger(blocking=True)
+        self.assertEquals(self.get_status_text(), 'nonblocking triggered !')
+
+    def test_nonblocking_trigger_to_blocking_action(self):
+        self.start_dialog('action')
+        action = self.funq.action(path='mainWindow::ActionDialog::blockingAction')
+        action.trigger(blocking=False)
+        # close the blocking message box
+        btn = self.funq.widget(path='QMessageBox::qt_msgbox_buttonbox::QPushButton')
+        btn.click()
+        # now the status text must be updated
+        self.assertEquals(self.get_status_text(), 'blocking triggered !')

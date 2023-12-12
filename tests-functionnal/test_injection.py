@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright: SCLE SFE
-# Contributor: Julien Pagès <j.parkouss@gmail.com>
+# Contributors: https://github.com/parkouss/funq/graphs/contributors
 #
 # This software is a computer program whose purpose is to test graphical
 # applications written with the QT framework (http://qt.digia.com/).
@@ -32,7 +32,32 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL v2.1 license and that you accept its terms.
 
-"""
-funq module, containing the __version__ string.
-"""
-__version__ = '1.2.0'
+from base import AppTestCase
+from funq.errors import FunqError
+
+
+class TestInjection(AppTestCase):
+
+    def setUp(self):
+        # Show a blocking message box *before* Qt's main event loop is entered!
+        self.__app_config__.args = ['--show-message-box-at-startup']
+
+        def restore_args():
+            self.__app_config__.args = []
+        self.addCleanup(restore_args)
+        super(TestInjection, self).setUp()
+
+    def test_close_blocking_msgbox_at_startup(self):
+        """
+        Test if the injection also works if Qt's main event loop was not
+        entered yet because of a blocking message box.
+        """
+        with self.assertRaises(FunqError):
+            # the main window must NOT be available yet!
+            self.funq.widget(path='mainWindow::QWidget', timeout=2.0)
+        # close the blocking message box
+        btn = self.funq.widget(path='QMessageBox::qt_msgbox_buttonbox::QPushButton')
+        btn.click()
+        # now the main window should be visible
+        window = self.funq.widget(path='mainWindow::QWidget')
+        self.assertEquals(window.properties()['visible'], True)

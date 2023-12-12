@@ -32,52 +32,46 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL v2.1 license and that you accept its terms.
 
+import io
+import os
 from base import AppTestCase
-from funq.testcase import parameterized
 
 
-class TestClick(AppTestCase):
+# Note: Captured screenshots are saved in the "screenshots" directory,
+#       so they can be checked for correctness manually.
+if not os.path.exists('screenshots'):
+    os.mkdir('screenshots')
 
-    def test_simple_click(self):
+
+class TestScreenshot(AppTestCase):
+
+    def test_take_screenshot(self):
+        buffer = io.BytesIO()
+        self.funq.take_screenshot(stream=buffer)
+        png = buffer.getvalue()
+        with open('screenshots/take_screenshot.png', mode='wb') as f:
+            f.write(png)
+        self.assertGreater(len(png), 0)
+
+    def test_grab_window(self):
+        win = self.funq.widget(path='mainWindow')
+        png = win.grab()
+        with open('screenshots/grab_window.png', mode='wb') as f:
+            f.write(png)
+        self.assertGreater(len(png), 0)
+
+    def test_grab_dialog(self):
+        self.start_dialog('click')
+        dialog = self.funq.widget(path='mainWindow::ClickDialog')
+        png = dialog.grab()
+        with open('screenshots/grab_dialog.png', mode='wb') as f:
+            f.write(png)
+        self.assertGreater(len(png), 0)
+
+    def test_grab_button(self):
         self.start_dialog('click')
         btn = self.funq.widget(path='mainWindow::ClickDialog::QPushButton')
-        btn.click()
-        self.assertEquals(self.get_status_text(), 'clicked !')
-
-    def test_right_click(self):
-        self.start_dialog('widgetclick')
-        btn = self.funq.widget(path='mainWindow::WidgetClickDialog')
-        btn.click(btn='right')
-        self.assertEquals(self.get_status_text(), 'right clicked !')
-
-    def test_middle_click(self):
-        self.start_dialog('widgetclick')
-        btn = self.funq.widget(path='mainWindow::WidgetClickDialog')
-        btn.click(btn='middle')
-        self.assertEquals(self.get_status_text(), 'middle clicked !')
-
-    def test_double_click(self):
-        self.start_dialog('doubleclick')
-        btn = self.funq.widget(path='mainWindow::DoubleClickDialog')
-        btn.dclick()
-        self.assertEquals(self.get_status_text(), 'double clicked !')
-
-    @parameterized('sometext', 'Hello this is me !')
-    @parameterized('someothertext', 'AAAA BBBBBBBBBBBBBBBBBB CCCCCCCCCCCCCCCCCCCC')
-    def test_key_click(self, text):
-        self.start_dialog('keyclick')
-        line = self.funq.widget(path='mainWindow::KeyClickDialog::QLineEdit')
-        line.keyclick(text)
-        self.assertEquals(self.get_status_text(), text)
-
-    @parameterized('R1', 'H', 0, 0)
-    @parameterized('R1_by_name', 'H', 'C1', 0)
-    @parameterized('V2', 'V', 1, 1)
-    def test_click_header(self, orientation, index_or_name, result_index):
-        self.start_dialog('table')
-        header = self.funq.widget(path='mainWindow::TableDialog::QTableWidget::' + orientation)
-        header.header_click(index_or_name)
-        self.assertEquals(
-            self.get_status_text(),
-            orientation + " Header clicked: " + str(result_index)
-        )
+        png = btn.grab()
+        with open('screenshots/grab_button.png', mode='wb') as f:
+            f.write(png)
+        self.assertGreater(len(png), 0)

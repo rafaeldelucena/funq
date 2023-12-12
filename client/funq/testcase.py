@@ -45,6 +45,14 @@ import re
 import inspect
 
 
+# python 3 compatibility
+# https://stackoverflow.com/questions/11301138/how-to-check-if-variable-is-string-with-python-2-and-3-compatibility)
+try:
+    unicode
+except NameError:
+    unicode = str
+
+
 class AssertionSuccessError(AssertionError):
 
     """
@@ -133,8 +141,8 @@ def parameterized(func_suffix, *args, **kwargs):
               print value, named
 
     :param func_suffix: will be used as a suffix for the new method
-    :param \*args: arguments to pass to the new method
-    :param \*\*kwargs: named arguments to pass to the new method
+    :param `*args`: arguments to pass to the new method
+    :param `**kwargs`: named arguments to pass to the new method
     """
     def wrapped(func):
         if not hasattr(func, 'parameters'):
